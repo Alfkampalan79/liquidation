@@ -1,0 +1,163 @@
+ <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="images/liquid.ico" type="image/x-icon">
+    <title>Liquidation For Sellers</title>
+    <link rel="stylesheet" href="style.css">    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+</head>
+<body>
+    <main>
+       <section id="admin-dashboard" class="container" style="display: none;">
+        <h2>Admin Dashboard</h2>
+            <h3>Latest Listings</h3>
+            <ul id="admin-latest-listings">
+                </ul>
+            <h3>Admin Functions</h3>
+            <button class="action-button" id="create-admin-button">Create New Admin (Conceptual)</button>
+            <button class="action-button" id="admin-list-item-button">List Item as Admin (Conceptual)</button>
+            <button class="action-button" id="manage-users-button">Manage Users (Conceptual)</button>
+            <button class="action-button" id="approve-listings-button">Approve Listings (Conceptual)</button>
+            <button class="action-button" id="view-all-sellers-button">View All Sellers (Conceptual)</button>
+            <button class="action-button" id="admin-logout-button">Logout</button>
+        </section>
+
+        <section id="auth-container" class="container">
+            <div class="logo-container">
+                <img src="images/liquid.png" alt="LiquidationLogo" class="logo">
+            </div>
+            <h2>Authentication</h2>
+            <button class="action-button" id="guest-login-button">Guest Login</button>
+            <button class="action-button" id="admin-login-button">Admin Login</button>
+            <button class="action-button" id="logout-button" style="display: none;">Logout</button>
+            <div id="user-info" style="display: none;">
+                </div>
+            <nav class="button-group">
+                <button class="contact-button" id="whatsapp-button">Chat with Liquidation</button>
+                <button class="contact-button" id="call-operator-button">Call Us For Free!</button>
+            </nav>
+        </section>
+
+
+    <section id="listing-form" class="container" style="display: none;">
+        <h2>List New Item</h2>
+        <form id="listing-form-real">
+                <label for="item-name">Item Name:</label>
+                <input type="text" id="item-name" class="form-input" required>
+                <label for="item-description">Description:</label>
+                <textarea id="item-description" class="form-input"></textarea>
+                <label for="item-price">Price:</label>
+                <input type="number" id="item-price" class="form-input" min="0" step="0.01" required>
+                <label for="item-location">Location:</label>
+                <input type="text" id="item-location" class="form-input">
+                <label for="seller-contact">Seller Contact:</label>
+                <input type="text" id="seller-contact" class="form-input" required>
+                <label for="item-image">Image :</label>
+                <input type="file" id="item-image" class="form-input" accept="image/*">
+            <button id="identify-objects-button" class="action-button">Identify Objects</button>  <div id="objectDetectionResults"></div> <button type="submit" class="action-button" id="submit-listing">Submit Listing</button>
+            </form>
+        </div>
+    <section id="seller-profile" class="container" style="display: none;">
+        <h2>Seller Profile</h2>
+        <div id="seller-profile-info"></div>
+        <div id="seller-profile-listings" class="listings-grid">
+        
+        </div>
+    </div>
+
+
+    <section id="listings-container" class="container listings-grid">
+            <h2>Public Listings</h2>
+            <div class="listings-grid" id="public-listings">
+            </div>
+        </section>
+    </main>
+
+
+    <script src="https://www.gstatic.com/firebasejs/11.2.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.2.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/11.2.0/firebase-firestore-compat.js"></script>
+    <script>
+        document.getElementById('listing-form').addEventListener('click', function(event) {
+            if (event.target && event.target.id === 'identify-objects-button') {
+                event.preventDefault(); // Prevent form submission
+
+                const imageFile = document.getElementById('item-image').files[0]; // Correctly using your existing image input 'item-image'
+                if (!imageFile) {
+                    alert("Please upload an image first.");
+                    return;
+                }
+                const reader = new FileReader();
+
+                reader.onloadend = function() {
+                    const base64Image = reader.result.split(',')[1]; // Extract base64 data
+
+                    // Vision API request
+                    fetch('https://vision.googleapis.com/v1/images:annotate?key=4391d43dbe3e81602b784022690f671ebb8ab5d1', { // **REPLACE YOUR_API_KEY HERE**
+                        method: 'POST',
+                        headers: {
+                            'Accept': 'application/json',
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            "requests": [{
+                                "image": {
+                                    "content": base64Image
+                                },
+                                "features": [{
+                                    "type": "OBJECT_LOCALIZATION",
+                                    "maxResults": 10 // Adjust as needed
+                                }]
+                            }]
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        displayObjectDetectionResults(data); // Function to handle and display results
+                    })
+                    .catch(error => {
+                        console.error('Error calling Vision API:', error);
+                        alert('Error identifying objects. Please try again.');
+                    });
+                };
+
+                reader.readAsDataURL(imageFile); // Read image file as Data URL
+            }
+        });
+
+        function displayObjectDetectionResults(data) {
+            const resultsDiv = document.getElementById('objectDetectionResults');
+            resultsDiv.innerHTML = ''; // Clear previous results
+
+            if (data.responses && data.responses[0].localizedObjectAnnotations) {
+                const objects = data.responses[0].localizedObjectAnnotations;
+                if (objects.length > 0) {
+                    let resultsHTML = '<h3>Identified Objects:</h3><ul>';
+                    objects.forEach(object => {
+                        resultsHTML += `<li>${object.name} (Confidence: ${object.score.toFixed(2)})</li>`;
+                    });
+                    resultsHTML += '</ul>';
+                    resultsDiv.innerHTML = resultsHTML;
+                    // **Integration Point:** Here you can pre-fill form fields based on detected objects
+                    // Example (adjust to your form field IDs and desired logic):
+                    if (objects.length > 0) {
+                        document.getElementById('item-name').value = objects[0].name; // Use the first detected object as item name (example)
+                    }
+
+
+                } else {
+                    resultsDiv.innerHTML = '<p>No objects identified in the image.</p>';
+                }
+            } else if (data.error) {
+                resultsDiv.innerHTML = `<p>Error from Vision API: ${data.error.message}</p>`;
+            } else {
+                resultsDiv.innerHTML = '<p>No objects identified or unexpected response from API.</p>';
+            }
+        }
+    </script>
+    <script src="main.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
